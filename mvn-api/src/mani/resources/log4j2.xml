@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--启动项设置为 trace，加载 springboot 启动内部各种详细输出-->
+<configuration status="INFO" monitorInterval="30">
+
+    <properties>
+        <!-- 配置日志文件输出目录 -->
+        <!-- <Property name="log_dir">${sys:log_dir}</Property> -->
+        <Property name="log_dir">/data/mvn-api/logs</Property>
+    </properties>
+
+    <Appenders>
+        <!--添加一个控制台追加器-->
+        <Console name="CONSOLE" target="SYSTEM_OUT" follow="true">
+            <PatternLayout charset="UTF-8" pattern="%d{yyyy-MM-dd HH:mm:ss:SSS}|%-5level|%thread|%X{invokeNo}|%c-%L| - %msg%n"/>
+        </Console>
+
+        <!-- 日志滚动存档(约定每天零点归档日志，且最多保留7天归档文件) -->
+        <RollingFile name="ROLLING_FILE" fileName="${log_dir}/catalina.out"
+                     filePattern="${log_dir}/catalina.%d{yyyy-MM-dd}.log.tar.gz"
+                     immediateFlush="false">
+            <Filters>
+                <!--控制台只输出level及以上级别的信息（onMatch）-->
+                <ThresholdFilter level="INFO" onMatch="ACCEPT"/>
+            </Filters>
+            <PatternLayout charset="UTF-8" pattern="%d{yyyy-MM-dd HH:mm:ss:SSS}|%-5level|%thread|%X{invokeNo}|%c-%L| - %msg%n"/>
+            <Policies>
+                <!-- modulate若为true，则日志时间将以0点为边界进行偏移计算; 每间隔interval(与filepattern滚动日期单位一致)发生一次rollover，得到一个log.tar.gz文件-->
+                <TimeBasedTriggeringPolicy modulate="true" interval="1"/>
+                <!-- 日志文件达到多少的时候进行滚动 -->
+                <!--<SizeBasedTriggeringPolicy size="10 MB"/>-->
+            </Policies>
+            <!-- 最多同一文件夹下7个日志压缩文件，默认7个-->
+            <!--<DefaultRolloverStrategy min="1" max="3"/>-->
+        </RollingFile>
+    </Appenders>
+
+    <!-- 最佳实践：
+        开启异步声明以便增加日志打印性能：
+        方式1. 配置AsynLogger及AsynRoot
+        方式2. classpath指定配置：log4j2.component.properties，增加内容：Log4jContextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector
+        方式3. 运行参数执行：-DLog4jContextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector
+        三者选其一即可，不可同时采用，且本模板采用方式1
+        且无需再定义<Async>
+        includeLocation:为true，则会将类名、行号等信息打印出来。会有性能损耗，看实际需要
+        建议测试及生产环境注释掉CONSOLE控制台打印
+    -->
+    <Loggers>
+        <AsyncLogger name="com.jiayincredit.monitor" level="INFO" additivity="false" includeLocation="false">
+            <appender-ref ref="CONSOLE"/>
+            <AppenderRef ref="ROLLING_FILE"/>
+        </AsyncLogger>
+
+        <!--<Logger name="org.springframework" level="INFO"/>
+        <logger name="org.apache" level="INFO"/>
+        <logger name="io.netty" level="INFO"/>
+        <Logger name="zaxxer.hikari" level="INFO"/>
+        <Logger name="org.thymeleaf" level="INFO"/>
+        <Logger name="org.ibatis" level="INFO"/>
+        <logger name="com.alibaba.fastjson" level="INFO"/>
+        <Logger name="java.sql" level="INFO"/>-->
+
+        <AsyncRoot level="INFO" includeLocation="false">
+            <AppenderRef ref="CONSOLE"/>
+            <AppenderRef ref="ROLLING_FILE" />
+        </AsyncRoot>
+    </Loggers>
+</configuration>

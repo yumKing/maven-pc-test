@@ -1,0 +1,112 @@
+SpringApplication.run(App.class, args); 
+1、run静态方法最终会运行SpringApplication实例的run方法
+	public static ConfigurableApplicationContext run(Class<?>[] primarySources, String[] args) {
+		return new SpringApplication(primarySources).run(args);
+	}
+	
+2、在实例化SpringApplication时，做了一些初始化操作
+	public SpringApplication(ResourceLoader resourceLoader, Class<?>... primarySources) {
+		this.resourceLoader = resourceLoader; 资源加载器配置，这里默认为null
+		Assert.notNull(primarySources, "PrimarySources must not be null"); 主资源类一定要有，当然可以是多个类
+		this.primarySources = new LinkedHashSet<>(Arrays.asList(primarySources)); 去重复资源类
+========this.resourceLoader = null ，初始化时是空的，后面才会实例
+========this.primarySources = 用户指定的类的Class类的实例
+========this.webApplicationType = deduceWebApplicationType(); 
+			推断web应用类型,这里推断了2种类型：
+			1、org.springframework.web.reactive.DispatcherHandler
+			2、javax.servlet.Servlet 和 org.springframework.web.context.ConfigurableWebApplicationContext
+			第一种返回嵌入回应式web server, 第二种返回嵌入servlet式web server,否则就不是web应用
+			类型有 webApplicationType: None, REACTIVE, SERVLET
+		
+		
+		setInitializers((Collection) getSpringFactoriesInstances(ApplicationContextInitializer.class));
+========this.initializers = instances	
+			上下文初始化，ApplicationContextInitializer工厂实例化，并添加到SpringApplication的initializers变量中
+				
+			private <T> Collection<T> getSpringFactoriesInstances(Class<T> type,
+					Class<?>[] parameterTypes, Object... args) {
+				使用了线程上下文加载器
+				ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+				
+				获取指定类型的全限定类名集，通过SpringFactoriesLoader加载所有包下路径META-INF/spring.factory文件全限定类名来获取	
+				这里加载的是ApplicationContextInitializer接口实例类名集，在spring-boot-2.0.1jar包下的META-INF/spring.factory中
+				# Application Context Initializers，共4个
+				org.springframework.context.ApplicationContextInitializer=
+				org.springframework.boot.context.ConfigurationWarningsApplicationContextInitializer,
+				org.springframework.boot.context.ContextIdApplicationContextInitializer,
+				org.springframework.boot.context.config.DelegatingApplicationContextInitializer,
+				org.springframework.boot.web.context.ServerPortInfoApplicationContextInitializer
+				
+				Set<String> names = new LinkedHashSet<>(
+						SpringFactoriesLoader.loadFactoryNames(type, classLoader));
+						
+				根据指定类型的全限定类名集 实例化,这里出现了kotlin语言注解，但这里不深入，默认使用reflect中的newInstance方法
+				List<T> instances = createSpringFactoriesInstances(type, parameterTypes,
+						classLoader, args, names);
+				排序
+				AnnotationAwareOrderComparator.sort(instances);
+				return instances;
+			}
+		
+		
+		setListeners((Collection) getSpringFactoriesInstances(ApplicationListener.class));
+========this.listeners = listeners
+			监听器初始化,和获取initializers一样，通过调用getSpringFactoriesInstances来实实例化，共9个
+			org.springframework.context.ApplicationListener=
+			org.springframework.boot.ClearCachesApplicationListener,
+			org.springframework.boot.builder.ParentContextCloserApplicationListener,
+			org.springframework.boot.context.FileEncodingApplicationListener,
+			org.springframework.boot.context.config.AnsiOutputApplicationListener,
+			org.springframework.boot.context.config.ConfigFileApplicationListener,
+			org.springframework.boot.context.config.DelegatingApplicationListener,
+			org.springframework.boot.context.logging.ClasspathLoggingApplicationListener,
+			org.springframework.boot.context.logging.LoggingApplicationListener,
+			org.springframework.boot.liquibase.LiquibaseServiceLocatorApplicationListener
+			
+========this.mainApplicationClass = deduceMainApplicationClass();
+			推断应用主类，通过运行时栈跟踪来判断main方法是由哪个类在使用
+			
+3、SpringApplication实例，运行run方法
+	1、构造一个秒表类，start()启动秒表， 用于获取应用启动时间
+	2、配置无头属性 java.awt.headless 默认是true
+	3、获取运行监听器的类SpringApplicationRunListener，一样用到了getSpringFactoriesInstances来实例化，
+	在实例化时SpringApplication实例将赋给了SpringApplicationRunListener类,并将this.listeners加载到
+	SpringApplicationRunListener 实例对象的属性 this.initialMulticaster(这个对象可以加载应用监听器)中
+		# Run Listeners
+		org.springframework.boot.SpringApplicationRunListener=
+		org.springframework.boot.context.event.EventPublishingRunListener
+		SpringApplicationRunListener.starting() 启动应用运行时事件监听
+		SpringApplicationRunListener类被SpringApplicationRunListeners封装起来了
+		
+	4、配置环境类ConfigurableEnvironment
+		1、如果之前设置的应用类型为SERLVET,则创建一个StandardServletEnvironment环境类，否则创建一个StandardEnvironment环境类
+		2、环境的参数配置，这些参数就是通过用户传递过来的
+		3、运行时监听器配置到环境类中
+		4、将环境类绑定到spring应用中
+		5、忽略bean信息配置
+		6、从环境类中获取banner，在这里配置了this.resourceLoader,默认是在控制台打印banner
+	5、创建应用上下文类ConfigurableApplicationContext
+		通过this.webApplicationType来确定使用哪个ConfigurableApplicationContext
+		SERVLET: 	org.springframework.boot.web.servlet.context.AnnotationConfigServletWebServerApplicationContext
+		REACTIVE: 	org.springframework.boot.web.reactive.context.AnnotationConfigReactiveWebServerApplicationContext
+		NONE: 		org.springframework.context.annotation.AnnotationConfigApplicationContext
+	6、获取SpringBootExceptionReporter类实例,一样用到了getSpringFactoriesInstances来实例化，出现异常，会使用到这个类
+		org.springframework.boot.SpringBootExceptionReporter=
+		org.springframework.boot.diagnostics.FailureAnalyzers
+	7、上下文准备、刷新，刷新后等操作
+		prepareContext(context, environment, listeners, applicationArguments,printedBanner);
+		refreshContext(context);
+		afterRefresh(context, applicationArguments);
+	8、stop()停止秒表
+	9、后续执行的内容
+		if (this.logStartupInfo) {
+				new StartupInfoLogger(this.mainApplicationClass)
+						.logStarted(getApplicationLog(), stopWatch);
+		}
+		listeners.started(context);
+		callRunners(context, applicationArguments); 容器启动成功后的最后一步回调（类似开机自启动）
+	callRunners方法中运行了2个实例
+		runners.addAll(context.getBeansOfType(ApplicationRunner.class).values());
+		ApplicationRunner实例 runner--> callRunner(runner)
+		CommandLineRunner实例 runner--> callRunner(runner)
+		
