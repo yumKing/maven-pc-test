@@ -77,7 +77,8 @@ SpringApplication.run(App.class, args);
 		org.springframework.boot.context.event.EventPublishingRunListener
 		SpringApplicationRunListener.starting() 启动应用运行时事件监听
 		SpringApplicationRunListener类被SpringApplicationRunListeners封装起来了
-		
+	listeners.starting(); //获取配置文件(动态扫描是什么类型的文件，就是用对应类型的日志监听器)，并启动异步日志守护线程，和调度日志守护线程
+	
 	4、配置环境类ConfigurableEnvironment
 		1、如果之前设置的应用类型为SERLVET,则创建一个StandardServletEnvironment环境类，否则创建一个StandardEnvironment环境类
 		2、环境的参数配置，这些参数就是通过用户传递过来的
@@ -95,7 +96,7 @@ SpringApplication.run(App.class, args);
 		org.springframework.boot.diagnostics.FailureAnalyzers
 	7、上下文准备、刷新，刷新后等操作
 		prepareContext(context, environment, listeners, applicationArguments,printedBanner);
-		refreshContext(context);
+		refreshContext(context); //真正启动容器线程的方法
 		afterRefresh(context, applicationArguments);
 	8、stop()停止秒表
 	9、后续执行的内容
@@ -105,7 +106,7 @@ SpringApplication.run(App.class, args);
 		}
 		listeners.started(context);
 		callRunners(context, applicationArguments); 容器启动成功后的最后一步回调（类似开机自启动）
-	callRunners方法中运行了2个实例
+	callRunners方法中运行了2个实例，可以自由实现
 		runners.addAll(context.getBeansOfType(ApplicationRunner.class).values());
 		ApplicationRunner实例 runner--> callRunner(runner)
 		CommandLineRunner实例 runner--> callRunner(runner)
